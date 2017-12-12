@@ -1,0 +1,677 @@
+/* THE CLOUD
+ *  Physical Computing project
+ *  Dyson School of Design Engineering, Imperial College London
+ *  Ellie Peatman, Pilar Zhang Qiu, Oliver Hoare & Thomas Gonda
+ */
+ 
+// FUNCTIONS
+#include <Stepper.h> // download library for the Steppers
+#include <FastLED.h> // download library for the LED
+
+// SET UP FOR THE LED
+#define LED_PIN   7
+#define NUM_LEDS  1
+#define COLOR_ORDER GRB
+CRGB leds[NUM_LEDS];
+
+
+// SET UP FOR FLEX SENSOR READING
+int fsrPin1 = 1;     // the FSR and 10K pulldown are connected to a1
+int thumb;
+int fsrPin2 = 2;
+int indexfinger;
+int fsrPin3 = 3;
+int middlefinger;
+int fsrPin4 = 4;
+int thirdfinger;
+int fsrPin5 = 5;
+int littlefinger;     // the analog reading from the FSR resistor divider
+
+
+// CONTROL OF THE ALGORITHM: the utility of these variables will become more obvious after reading the whole code
+int stepcount=0;
+int flag;
+int clenched=0; //0 if the hand was not previously in the clenched position and 1 if it was. 
+int disco=0;
+int dead=0;
+
+//DIRECTION: this part of the code helps us to know where we are on the plane. We take the origin of the space to be at the bottom left. 
+float x=0; // stores the position on the x axis. X motion corresponds to the two motors rotating in opposite directions. 
+float y=0; // stores the position on the y axis. Y motion corresponds to the two motors rotating in the same direction.
+int stepsPerRevolution = 200;  // this works fine in our case
+float increment=0.33; //Distance= (2*pi*radius of pulley) / (steps per revolution) = 2 * pi * 10 / 200 =~ 1/3 mm
+Stepper Stepper1(stepsPerRevolution, 8, 9, 10, 11); // setting up the pins for the stepper motors
+Stepper Stepper2(stepsPerRevolution, 2, 3, 4, 5);
+    //Note: to control the steppers motors, we tried having the x and y motion synchrnized by going one step at the time in each directions and run the void loop until the right position is obtained.
+    //But since we only have only one serial connexion, and since we have many if statements, this would result in a "lag" in the motion as the processing speed of the arduino was not suficient to go through
+    //all the statements fast enough to have a smooth movement. So, we had to introduce a while loop for the each movemements (x & y) to be executed one at a time, but smoothly.
+
+void setup(void) {
+  // We'll send debugging information via the Serial monitor
+  Serial.begin(9600);
+  thumb = analogRead(fsrPin1);  
+  indexfinger = analogRead(fsrPin5);
+  middlefinger = analogRead(fsrPin2);
+  thirdfinger = analogRead(fsrPin3);
+  littlefinger = analogRead(fsrPin4);
+
+  //LED
+  delay(1000); // sanity delay 
+  FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, NUM_LEDS);
+  FastLED.setBrightness( 200 );
+  leds[0] = CRGB::Black; //by default, there is no light
+  FastLED.show();
+
+}
+
+void loop(void) {    
+  
+  thumb = analogRead(fsrPin1);  
+  indexfinger = analogRead(fsrPin5);
+  middlefinger = analogRead(fsrPin2);
+  thirdfinger = analogRead(fsrPin3);
+  littlefinger = analogRead(fsrPin4);  
+
+  //RAW ANALOG READING
+  Serial.print("Thumb reading = ");
+  Serial.println(thumb);  
+  Serial.print("Index reading = ");
+  Serial.println(indexfinger);
+  Serial.print("Middle reading = ");
+  Serial.println(middlefinger);
+  Serial.print("Third reading = ");
+  Serial.println(thirdfinger);
+  Serial.print("Little reading = ");
+  Serial.println(littlefinger);
+
+  
+ //INITIALISATION
+//We do not read the ring finger (aka thirdfinger). One of the five sensors is broken as this finger is quite useless for gestures and difficult to use in itslef, so we decided to get rid of it.
+//We always need to re-center the sphere before moving it, otherwise mechanisms has hard a hard time.
+                                                                                                                           
+                                                                                                                            
+ if ( (thumb > 550) and (indexfinger < 450) and (middlefinger < 450) /*and (ringfinger < 450)*/ and (littlefinger < 450) ){ //if thumbs UP detected
+  
+     delay(5000); //wait 5sec
+      
+     if( (thumb > 550) and (indexfinger < 450) and (middlefinger < 450) /* and (ringfinger < 640)*/ and (littlefinger < 450) ){ // if thumbs UP still after 5sec
+                flag = 2; //when flag=2, system functions
+      }
+      }
+ if( (thumb < 550) and (indexfinger > 640) and (middlefinger > 640) /* and (ringfinger > 640)*/ and (littlefinger > 640) ){ //if thumbs IN deteceted
+  
+     delay(5000);
+
+     if ( (thumb < 550) and (indexfinger > 640) and (middlefinger > 640)/* and (ringfinger > 640)*/ and (littlefinger > 640) ){ //if thumbs IN still detected after 5sec
+         flag= 3; //when flag=3, system does not function 
+    }
+    }
+       
+    if (flag==2){
+        Serial.println(" The system IS supposed to function ");
+      
+    // FULLY OPEN   
+       if ( (thumb > 540) and (indexfinger > 640) and (middlefinger > 640) /* and (ringfinger > 640)*/ and (littlefinger > 640) ) { 
+
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Orange; //enter the color of the LED, they are uploaded from the library FASTLED.h that we uploaded at the beginning
+        FastLED.show(); //activate the LED
+        dead=0;  // is The Cloud dead? 0: No & 1:yes
+        
+        Serial.println("Fully Open");
+        Stepper1.setSpeed(100); // we set the speeds of the motor
+        Stepper2.setSpeed(100);
+
+        if(clenched==1){ // if the hand was previously clenched we first go back the the center-y position before doind anything
+        while(y<= -5){ // while haven't reached the position we want to be at 
+          Stepper1.step(+1); // make the motors do 1 step
+          Stepper2.step(+1);
+          y += +increment; //if we have done one step, that means we have moved of one increment (0.33mm, see explanation at the beginning)
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        clenched=0;
+        }
+        
+        while(x>=-46){ // the same logic that we have used for the y motion applies to the x motion
+          Stepper1.step(+1);
+          Stepper2.step(-1);
+          x += +increment;
+          Serial.print("x ");
+          Serial.println( x);
+        }
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        }
+     // INTERMEDIATE OPEN   
+       if ( (thumb > 480) and (indexfinger > 530) and (middlefinger > 530) /*and (thirdfinger > 580)*/  and (littlefinger > 530) ) {
+        
+        Serial.println(clenched);
+        FastLED.setBrightness( 200 );
+        leds[0] = CRGB::Yellow;
+        FastLED.show();
+        dead=0;
+
+        Serial.println("Intermediate Open");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        if(clenched==1){
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        clenched=0;
+        }
+    
+        while(x>-66 || x<-76){ // same thinking as for clenched
+          if(x<-76){           // but we distinguish the cases where we have to go forward or backwards
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x += +increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+         else if (x>-66){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+        }
+        while(y>= -15 || y<=-25 ){
+          if(y>=-15){
+            Stepper1.step(-1);
+            Stepper2.step(-1);
+            y += -increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+          else if(y<=-25){
+            Stepper1.step(+1);
+            Stepper2.step(+1);
+            y += +increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+        }
+       }
+     // MIDDLE
+        else if( (thumb > 460) and (indexfinger > 480) and (middlefinger > 480) /* and (thirdfinger > 520)*/ and (littlefinger > 480) ){
+        Serial.println(clenched);
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::White;
+        FastLED.show();
+        dead=0;
+
+        Serial.println("Middle");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        if(clenched==1){
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        clenched=0;
+        }
+    
+        while(x<-297 || x>-231){ //
+          if(x<-297){
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x +=  +increment; 
+            Serial.print("x ");
+            Serial.println( x);
+         }
+         else if (x>-231){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+        }
+        while(y>= -35 || y<=-45 ){
+          if(y>-35){
+            Stepper1.step(-1);
+            Stepper2.step(-1);
+            y += -increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+          else if(y<=-45){
+            Stepper1.step(+1);
+            Stepper2.step(+1);
+            y += +increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+        }
+        }
+    //INTERMEDIATE CLENCHED
+        else if( (thumb > 420) and (indexfinger > 460) and (middlefinger > 460) /* and (thirdfinger > 460)*/ and (littlefinger > 435) ){
+        
+        Serial.println(clenched);
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::MidnightBlue;
+        FastLED.show();
+        dead=0;
+        
+        Serial.println("Intermediate Clenched");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        if(clenched==1){
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        clenched=0;
+        }
+    
+        while(x<-429 || x>-363){ //
+          if(x<-429){
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x += +increment;
+            Serial.print("x " );
+            Serial.println( x);
+         }
+         else if (x>-363){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x " );
+            Serial.println( x);
+         }
+        }
+        while(y>= -55 || y<=-65 ){
+          if(y>=-55){
+            Stepper1.step(-1);
+            Stepper2.step(-1);
+            y += -increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+          else if(y<=-65){
+            Stepper1.step(+1);
+            Stepper2.step(+1);
+            y += +increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+        }
+        }   
+    //CLENCHED
+        else if ( (thumb > 350) and (indexfinger < 460) and (middlefinger > 350) /* and (thirdfinger > 400)*/ and (littlefinger < 450)) {
+
+       
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::DarkBlue;
+        FastLED.show();
+        dead=0;
+
+        Serial.println("Clenched");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        if(clenched==0){
+          while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        }
+
+        clenched=1;
+        
+        while(x>-476){
+          Stepper1.step(-1);
+          Stepper2.step(+1);
+          x += -increment;
+          Serial.print("x ");
+          Serial.println( x);
+        }
+
+        while(y> -75 || y<=-85 ){
+          if(y>=-75){
+            Stepper1.step(-1);
+            Stepper2.step(-1);
+            y += -increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+          else if(y<=-85){
+            Stepper1.step(+1);
+            Stepper2.step(+1);
+            y += +increment;
+            Serial.print("y ");
+            Serial.println( y);
+          }
+        }
+        }
+
+    //MOTIONNNNNNNNNNNNNNNNNNNNNNNNNNNNNNS: special motions to make the interaction a lot more fun than just playing with the contraction of the hand, there are a lot of possibilities
+    
+     //SHAKA: just like sufers do
+        else if( (thumb > 580) and (indexfinger < 450) and (middlefinger < 450) /* and (thirdfinger < 450)*/ and (littlefinger > 550) ){
+
+        Serial.println("Shaka");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+        dead=0;
+
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::Navy; 
+        FastLED.show();
+
+        // going to center with y
+         while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+
+        // going to intermediate open with x
+        while(x>=-99 || x<-165){ //
+          if(x<-165){
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x += +increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+         else if (x>-99){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+        }
+
+        }
+     //ROCK N'ROLL: because being a surfer isn't cool enough
+        else if( (thumb < 550) and (indexfinger > 600) and (middlefinger < 500) /* and (thirdfinger < 450)*/ and (littlefinger > 600) ){
+
+        Serial.println("Rock n'roll");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+        dead=0;
+
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::Fuchsia;
+        FastLED.show();
+
+        // going to center with y
+         while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+
+        // going to middle wiht x
+        while(x<-297 || x>-231){ 
+          if(x<-297){
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x +=  +increment; 
+            Serial.print("x ");
+            Serial.println( x);
+         }
+         else if (x>-231){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+        }
+        }
+     //BANG BANG: don't do it, he's innocent!
+        else if( (thumb > 580) and (indexfinger > 580) and (middlefinger > 580) /* and (thirdfinger < 600)*/ and (littlefinger < 450) ){
+
+        if(dead==0){
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::Red; //the cloud is bleeding
+        FastLED.show();
+        }
+
+        Serial.println("Bang Bang");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        // going to center with y
+         while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+
+        //going clenched with x
+        while(x>-466){
+          Stepper1.step(-1);
+          Stepper2.step(+1);
+          x += -increment;
+          Serial.print("x ");
+          Serial.println( x);
+        }
+        
+        dead=1;  // is The Cloud dead? 0: No & 1:yes
+        
+        if(dead==1){
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::Black; //the could is dead
+        FastLED.show();
+        }
+        }
+     //PEACE: because after war comes peace
+        else if( (thumb < 500) and (indexfinger > 650) and (middlefinger > 650) /* and (thirdfinger < 450)*/ and (littlefinger < 450) ){
+
+        Serial.println("Peace");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::Yellow;
+        FastLED.show();
+
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+
+        // go x and y same as fully open
+       while(x<=-66){
+          Stepper1.step(+1);
+          Stepper2.step(-1);
+          x += +increment;
+          Serial.print("x ");
+          Serial.println( x);
+        }
+        }
+     //DISCO: feeling a bit nostalgic?
+        else if( (thumb < 550) and (indexfinger > 600) and (middlefinger < 460) /* and (thirdfinger < 460)*/ and (littlefinger < 460) ){
+          
+        Serial.println("Disco");
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+          
+        // going to middle with x
+        while(x<-297 || x>-231){ //
+          if(x<-297){
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x +=  +increment; 
+            Serial.print("x ");
+            Serial.println( x);
+         }
+         else if (x>-231){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+        }
+
+       // disco lights wohoooooo
+        disco=1; // are the disco lights supposed to be on? 0: No & 1:yes
+        while(disco==1){ //while we are the disco loop, run plenty of different colours
+
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Green; //insert code that blinks
+        FastLED.show();
+        
+        delay(100);
+
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Aquamarine; //insert code that blinks
+        FastLED.show();
+
+        delay(100);
+
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Purple; //insert code that blinks
+        FastLED.show();
+
+        delay(100);
+
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Red; //insert code that blinks
+        FastLED.show();
+
+        delay(100);
+        
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Yellow; //insert code that blinks
+        FastLED.show();
+
+        delay(100);
+        
+        FastLED.setBrightness( 200 ); //High = 200, Low = 50
+        leds[0] = CRGB::Orange; //insert code that blinks
+        FastLED.show();
+
+        delay(100);
+        
+        FastLED.setBrightness( 100 ); //High = 200, Low = 50
+        leds[0] = CRGB::DarkBlue;
+        FastLED.show();
+
+        disco=0; // we are breaking out of the loop, so it forces the algorithm to re-read the finger values. Otherwise we would never be able to get out of the loop.
+}
+        }
+     //F**K OFF: because sometimes we have enough of the cloud
+        else if( (thumb < 500) and (indexfinger < 500) and (middlefinger > 600) /* and (thirdfinger < 460)*/ and (littlefinger < 500) ){
+          
+        Stepper1.setSpeed(100);
+        Stepper2.setSpeed(100);
+
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::Black; // the cloud is annoyed at you and wants to hide
+        FastLED.show();
+
+        while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+
+        // x clenched and y in corner
+        while(x>-466){
+          Stepper1.step(-1);
+          Stepper2.step(+1);
+          x += -increment;
+          Serial.print("x ");
+          Serial.println( x);
+        }
+        // going to center with y
+         while(y<= -5){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+        }
+    }
+
+
+          
+    else if(flag==3){
+      Serial.println(" The system IS NOT supposed to function ");
+      
+      // going very center with x
+      while(x<-297 || x>-231){ //
+          if(x<-297){
+            Stepper1.step(+1);
+            Stepper2.step(-1);
+            x +=  +increment; 
+            Serial.print("x ");
+            Serial.println( x);
+         }
+         else if (x>-231){
+            Stepper1.step(-1);
+            Stepper2.step(+1);
+            x += -increment;
+            Serial.print("x ");
+            Serial.println( x);
+         }
+        }
+      // going very center with y
+         while(y<= -1){
+          Stepper1.step(+1);
+          Stepper2.step(+1);
+          y += +increment;
+          Serial.print("y ");
+          Serial.println( y);
+          }
+          
+        while(donotmove==1){
+
+        FastLED.setBrightness( 200 ); 
+        leds[0] = CRGB::White; 
+        FastLED.show();
+        
+
+}
+}
+}
