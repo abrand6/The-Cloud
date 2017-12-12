@@ -3,10 +3,9 @@
  *  Dyson School of Design Engineering, Imperial College London
  *  Ellie Peatman, Pilar Zhang Qiu, Oliver Hoare & Thomas Gonda
  */
- 
 // FUNCTIONS
 #include <Stepper.h> // download library for the Steppers
-#include <FastLED.h> // download library for the LED
+#include <FastLED.h> // download library for the LED: this can be downloaded using the following link
 
 // SET UP FOR THE LED
 #define LED_PIN   7
@@ -34,6 +33,7 @@ int flag;
 int clenched=0; //0 if the hand was not previously in the clenched position and 1 if it was. 
 int disco=0;
 int dead=0;
+int donotmove;
 
 //DIRECTION: this part of the code helps us to know where we are on the plane. We take the origin of the space to be at the bottom left. 
 float x=0; // stores the position on the x axis. X motion corresponds to the two motors rotating in opposite directions. 
@@ -638,6 +638,8 @@ void loop(void) {
           
     else if(flag==3){
       Serial.println(" The system IS NOT supposed to function ");
+
+      donotmove=1
       
       // going very center with x
       while(x<-297 || x>-231){ //
@@ -670,6 +672,7 @@ void loop(void) {
         FastLED.setBrightness( 200 ); 
         leds[0] = CRGB::White; 
         FastLED.show();
+        donotmove=0
         
 
 }
