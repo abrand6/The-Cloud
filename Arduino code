@@ -3,6 +3,7 @@
  *  Dyson School of Design Engineering, Imperial College London
  *  Ellie Peatman, Pilar Zhang Qiu, Oliver Hoare & Thomas Gonda
  */
+ 
 // FUNCTIONS
 #include <Stepper.h> // download library for the Steppers
 #include <FastLED.h> // download library for the LED. This can be downloaded using the following link: http://fastled.io/
@@ -87,7 +88,7 @@ void loop(void) {
   
  //INITIALISATION
 //We do not read the ring finger (aka thirdfinger). One of the five sensors is broken as this finger is quite useless for gestures and difficult to use in itslef, so we decided to get rid of it.
-//We always need to re-center the sphere before moving it, otherwise mechanisms has hard a hard time.
+//We always need to re-center the sphere before moving it, otherwise mechanisms has a hard time.
                                                                                                                            
                                                                                                                             
  if ( (thumb > 550) and (indexfinger < 450) and (middlefinger < 450) /*and (ringfinger < 450)*/ and (littlefinger < 450) ){ //if thumbs UP detected
@@ -114,7 +115,7 @@ void loop(void) {
        if ( (thumb > 540) and (indexfinger > 640) and (middlefinger > 640) /* and (ringfinger > 640)*/ and (littlefinger > 640) ) { 
 
         FastLED.setBrightness( 200 ); //High = 200, Low = 50
-        leds[0] = CRGB::Orange; //enter the color of the LED, they are uploaded from the library FASTLED.h that we uploaded at the beginning
+        leds[0] = CRGB::Orange; //enter the color of the LED, they are imported from the FASTLED.h library 
         FastLED.show(); //activate the LED
         dead=0;  // is The Cloud dead? 0: No & 1:yes
         
