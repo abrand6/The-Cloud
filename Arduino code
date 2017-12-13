@@ -5,7 +5,7 @@
  */
 // FUNCTIONS
 #include <Stepper.h> // download library for the Steppers
-#include <FastLED.h> // download library for the LED: this can be downloaded using the following link
+#include <FastLED.h> // download library for the LED. This can be downloaded using the following link: http://fastled.io/
 
 // SET UP FOR THE LED
 #define LED_PIN   7
